@@ -3,6 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { lintCode } from './services/linterService.js';
 import { reviewCodeWithGemini } from './services/geminiService.js';
+import { calculateQualityScore } from './utils/scoringAlgorithm.js';
 
 dotenv.config();
 
@@ -36,7 +37,7 @@ app.post('/api/lint', async (req, res) => {
   }
 });
 
-// Hybrid Review Endpoint (ESLint + Gemini AI)
+// Hybrid Review Endpoint (ESLint + Gemini AI + Scoring Engine)
 app.post('/api/review', async (req, res) => {
   try {
     const { code } = req.body;
@@ -44,15 +45,26 @@ app.post('/api/review', async (req, res) => {
       return res.status(400).json({ error: 'Please provide code in request body' });
     }
 
-    console.log(' Running ESLint static analysis...');
+    console.log('🔍 Running ESLint static analysis...');
     const linterIssues = await lintCode(code);
 
-    console.log(' Sending code and linter findings to Gemini AI...');
+    console.log('🤖 Sending code and linter findings to Gemini AI...');
     const aiReview = await reviewCodeWithGemini(code, linterIssues);
+
+    console.log('📊 Calculating Quality Score...');
+    const scoreData = calculateQualityScore(aiReview.issues);
 
     res.status(200).json({
       success: true,
-      data: aiReview
+      data: {
+        summary: aiReview.summary,
+        score: scoreData.score,
+        grade: scoreData.grade,
+        label: scoreData.label,
+        breakdown: scoreData.breakdown,
+        severityCounts: scoreData.severityCounts,
+        issues: aiReview.issues
+      }
     });
   } catch (error) {
     console.error('Review endpoint error:', error);
@@ -64,5 +76,5 @@ app.post('/api/review', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(` CodeSense AI Server running on http://localhost:${PORT}`);
+  console.log(`🚀 CodeSense AI Server running on http://localhost:${PORT}`);
 });
