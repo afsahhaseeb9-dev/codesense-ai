@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { lintCode } from './services/linterService.js';
 
 dotenv.config();
 
@@ -18,6 +19,25 @@ app.get('/api/health', (req, res) => {
     message: 'CodeSense AI backend is running',
     timestamp: new Date().toISOString()
   });
+});
+
+// Test Linter Endpoint
+app.post('/api/lint', async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: 'Please provide code in request body' });
+    }
+
+    const issues = await lintCode(code);
+    res.status(200).json({
+      success: true,
+      issueCount: issues.length,
+      issues
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to lint code' });
+  }
 });
 
 app.listen(PORT, () => {
