@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { lintCode } from './services/linterService.js';
 import { reviewCodeWithGemini } from './services/geminiService.js';
 import { calculateQualityScore } from './utils/scoringAlgorithm.js';
+import { fetchGitHubFile } from './services/githubService.js';
 
 dotenv.config();
 
@@ -21,6 +22,21 @@ app.get('/api/health', (req, res) => {
     message: 'CodeSense AI backend is running',
     timestamp: new Date().toISOString()
   });
+});
+
+// GitHub Fetch File Endpoint
+app.post('/api/github/fetch', async (req, res) => {
+  try {
+    const { url } = req.body;
+    if (!url) {
+      return res.status(400).json({ success: false, error: 'Please provide a GitHub URL' });
+    }
+
+    const fileData = await fetchGitHubFile(url);
+    res.status(200).json({ success: true, data: fileData });
+  } catch (error) {
+    res.status(400).json({ success: false, error: error.message });
+  }
 });
 
 // Quick Linter Endpoint
