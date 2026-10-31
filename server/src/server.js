@@ -7,6 +7,7 @@ import { reviewCodeWithGemini } from './services/geminiService.js';
 import { calculateQualityScore } from './utils/scoringAlgorithm.js';
 import { fetchGitHubFile } from './services/githubService.js';
 import { Submission } from './models/Submission.js';
+import mongoose from 'mongoose'; // <--- Add this at line 8
 
 dotenv.config();
 
@@ -114,25 +115,76 @@ app.post('/api/review', async (req, res) => {
 // 5. Get Submissions History Route (MongoDB + Local Fallback)
 app.get('/api/submissions', async (req, res) => {
   try {
-    let dbSubmissions = [];
-    try {
-      dbSubmissions = await Submission.find().sort({ createdAt: -1 }).limit(50);
-    } catch (e) {
-      // If DB has an issue, fallback to local cache
+    // If MongoDB is connected, get latest from database
+    if (mongoose.connection.readyState === 1) {
+      const dbSubmissions = await Submission.find().sort({ createdAt: -1 }).limit(50);
+      return res.status(200).json(dbSubmissions);
     }
-
-    const finalData = dbSubmissions.length > 0 ? dbSubmissions : localSubmissions;
-
-    res.status(200).json({
-      success: true,
-      count: finalData.length,
-      data: finalData
-    });
+    // If MongoDB Atlas is offline or not whitelisted, serve local cache immediately
+    console.log('Serving submissions from local cache (in-memory)...');
+    return res.status(200).json(localSubmissions);
   } catch (error) {
-    res.status(500).json({ success: false, error: 'Failed to fetch submissions' });
+    console.warn('Database error; falling back to local cache:', error.message);
+    return res.status(200).json(localSubmissions);
   }
 });
+app.post('/api/submissions/seed', (req, res) => {
+  const demoData = [
+    {
+      _id: 'seed-1',
+      studentName: 'Alex Chen',
+      projectName: 'Auth Module',
+      score: 65,
+      grade: 'D',
+      label: 'Needs Improvement',
+      issues: [{ severity: 'high' }, { severity: 'high' }, { severity: 'medium' }],
+      createdAt: new Date(Date.now() - 86400000 * 4).toISOString()
+    },
+    {
+      _id: 'seed-2',
+      studentName: 'Sarah Jenkins',
+      projectName: 'Shopping Cart API',
+      score: 92,
+      grade: 'A',
+      label: 'Excellent',
+      issues: [{ severity: 'low' }],
+      createdAt: new Date(Date.now() - 86400000 * 3).toISOString()
+    },
+    {
+      _id: 'seed-3',
+      studentName: 'Marcus Vance',
+      projectName: 'Payment Gateway',
+      score: 84,
+      grade: 'B',
+      label: 'Good',
+      issues: [{ severity: 'medium' }, { severity: 'low' }],
+      createdAt: new Date(Date.now() - 86400000 * 2).toISOString()
+    },
+    {
+      _id: 'seed-4',
+      studentName: 'Priya Sharma',
+      projectName: 'User Profile Service',
+      score: 78,
+      grade: 'C',
+      label: 'Fair',
+      issues: [{ severity: 'high' }, { severity: 'medium' }],
+      createdAt: new Date(Date.now() - 86400000 * 1).toISOString()
+    },
+    {
+      _id: 'seed-5',
+      studentName: 'afsah haseeb',
+      projectName: 'Auth Module',
+      score: 65,
+      grade: 'D',
+      label: 'Needs Improvement',
+      issues: [{ severity: 'high' }, { severity: 'high' }, { severity: 'medium' }],
+      createdAt: new Date().toISOString()
+    }
+  ];
 
+  localSubmissions = [...demoData, ...localSubmissions];
+  res.json({ success: true, count: demoData.length });
+});
 app.listen(PORT, () => {
   console.log(`CodeSense AI Server running on http://localhost:${PORT}`);
 });

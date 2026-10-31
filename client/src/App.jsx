@@ -128,16 +128,27 @@ export default function App() {
   const [submissions, setSubmissions] = useState([]);
   const [teacherSearch, setTeacherSearch] = useState('');
 
-  // Fetch submissions from backend
+  // Fetch submissions safely from backend
   const fetchSubmissions = async () => {
     try {
       const res = await fetch('http://127.0.0.1:5000/api/submissions');
       if (res.ok) {
-        const data = await res.json();
-        setSubmissions(data);
+        const result = await res.json();
+        const list = Array.isArray(result) ? result : (result?.data || []);
+        setSubmissions(Array.isArray(list) ? list : []);
       }
     } catch (err) {
       console.warn('Could not fetch submissions from server:', err);
+      setSubmissions([]);
+    }
+  };
+
+  const handleSeedDemoData = async () => {
+    try {
+      await fetch('http://127.0.0.1:5000/api/submissions/seed', { method: 'POST' });
+      await fetchSubmissions();
+    } catch (e) {
+      console.error('Failed to seed demo data:', e);
     }
   };
 
@@ -161,7 +172,7 @@ export default function App() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to fetch GitHub code');
-      setCode(data.code);
+      setCode(data.data?.code || data.code || '');
       setInputMode('paste');
     } catch (err) {
       setError(err.message);
@@ -191,6 +202,7 @@ export default function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Review failed');
       setReviewResult(data);
+      setSeverityFilter('all');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -722,14 +734,14 @@ ${issue.suggestedFix}
                 </button>
               </div>
 
-              {submissions.length > 0 ? (
+              {(submissions || []).length > 0 ? (
                 <div className="h-64 w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart
-                      data={submissions.map((sub, i) => ({
+                      data={(submissions || []).map((sub, i) => ({
                         run: `#${i + 1}`,
-                        score: sub.score,
-                        student: sub.studentName,
+                        score: Number(sub?.score) || 0,
+                        student: sub?.studentName || 'Student',
                       }))}
                     >
                       <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
@@ -778,19 +790,19 @@ ${issue.suggestedFix}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {submissions.map((sub, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                        <td className="px-4 py-3 font-semibold text-slate-900">{sub.studentName}</td>
-                        <td className="px-4 py-3 text-slate-500">{sub.projectName}</td>
-                        <td className="px-4 py-3 font-bold text-indigo-600">{sub.score} / 100</td>
+                    {(submissions || []).map((sub, idx) => (
+                      <tr key={sub?._id || idx} className="hover:bg-slate-50/70 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-slate-900">{sub?.studentName || 'Anonymous'}</td>
+                        <td className="px-4 py-3 text-slate-500">{sub?.projectName || 'Project'}</td>
+                        <td className="px-4 py-3 font-bold text-indigo-600">{sub?.score ?? 0} / 100</td>
                         <td className="px-4 py-3">
                           <span className="px-2 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                            {sub.grade}
+                            {sub?.grade || 'N/A'}
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-mono">{sub.issues?.length || 0}</td>
+                        <td className="px-4 py-3 font-mono">{(sub?.issues || []).length}</td>
                         <td className="px-4 py-3 text-slate-400">
-                          {sub.createdAt ? new Date(sub.createdAt).toLocaleDateString() : 'Today'}
+                          {sub?.createdAt ? new Date(sub.createdAt).toLocaleDateString() : 'Today'}
                         </td>
                       </tr>
                     ))}
@@ -806,12 +818,26 @@ ${issue.suggestedFix}
         {/* ============================================================== */}
         {activeTab === 'teacher' && (
           <div className="space-y-6">
+            {/* Demo Data Seeder Banner */}
+            <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 p-4 rounded-2xl text-white shadow-md flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold">Classroom Insights & Analytics</h3>
+                <p className="text-xs text-indigo-100">Monitor student grades, average scores, and common code vulnerabilities.</p>
+              </div>
+              <button
+                onClick={handleSeedDemoData}
+                className="px-3 py-1.5 bg-white text-indigo-700 hover:bg-indigo-50 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center space-x-1.5"
+              >
+                <span>✨ Populate Demo Class</span>
+              </button>
+            </div>
+
             {/* Top Stat Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm flex items-center justify-between">
                 <div>
                   <div className="text-xs font-bold text-slate-400 uppercase">Total Submissions</div>
-                  <div className="text-2xl font-black text-slate-800 mt-1">{submissions.length}</div>
+                  <div className="text-2xl font-black text-slate-800 mt-1">{(submissions || []).length}</div>
                 </div>
                 <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">
                   📝
@@ -822,8 +848,10 @@ ${issue.suggestedFix}
                 <div>
                   <div className="text-xs font-bold text-slate-400 uppercase">Class Average Score</div>
                   <div className="text-2xl font-black text-indigo-600 mt-1">
-                    {submissions.length
-                      ? Math.round(submissions.reduce((acc, s) => acc + (s.score || 0), 0) / submissions.length)
+                    {(submissions || []).length > 0
+                      ? Math.round(
+                          submissions.reduce((acc, s) => acc + (Number(s?.score) || 0), 0) / submissions.length
+                        )
                       : 0}
                     <span className="text-sm font-normal text-slate-400"> / 100</span>
                   </div>
@@ -872,21 +900,25 @@ ${issue.suggestedFix}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700">
-                    {submissions
-                      .filter((s) => (s.studentName || '').toLowerCase().includes(teacherSearch.toLowerCase()))
+                    {(submissions || [])
+                      .filter((s) =>
+                        String(s?.studentName || '')
+                          .toLowerCase()
+                          .includes(String(teacherSearch || '').toLowerCase())
+                      )
                       .map((sub, idx) => (
-                        <tr key={idx} className="hover:bg-slate-50/70 transition-colors">
-                          <td className="px-4 py-3 font-bold text-slate-900">{sub.studentName}</td>
-                          <td className="px-4 py-3 text-slate-500">{sub.projectName}</td>
+                        <tr key={sub?._id || idx} className="hover:bg-slate-50/70 transition-colors">
+                          <td className="px-4 py-3 font-bold text-slate-900">{sub?.studentName || 'Anonymous'}</td>
+                          <td className="px-4 py-3 text-slate-500">{sub?.projectName || 'Project'}</td>
                           <td className="px-4 py-3 font-semibold">
-                            <span className="text-indigo-600 font-bold">{sub.score}</span> / 100
+                            <span className="text-indigo-600 font-bold">{sub?.score ?? 0}</span> / 100
                             <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] bg-slate-100 font-bold">
-                              Grade {sub.grade}
+                              Grade {sub?.grade || 'N/A'}
                             </span>
                           </td>
-                          <td className="px-4 py-3">{sub.issues?.length || 0} issues</td>
+                          <td className="px-4 py-3">{(sub?.issues || []).length} issues</td>
                           <td className="px-4 py-3">
-                            {sub.score >= 80 ? (
+                            {(sub?.score ?? 0) >= 80 ? (
                               <span className="text-emerald-600 font-bold flex items-center space-x-1">
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                                 <span>Passed</span>
