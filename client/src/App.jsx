@@ -96,17 +96,7 @@ function ScoreRing({ score = 0, grade = 'N/A', size = 116, strokeWidth = 10 }) {
   );
 }
 
-const DEFAULT_CODE = `// Sample buggy JavaScript code to test
-const apiKey = "AIzaSyD-secret-demo-key-12345";
-
-function login(user, pass) {
-  if (user == "admin") {
-    console.log("Welcome Admin! Access granted.");
-    return true;
-  }
-}
-
-login("admin", "wrong_password");`;
+const DEFAULT_CODE = `// write a buggy JavaScript code to test`;
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('reviewer'); // 'reviewer' | 'history' | 'teacher'
@@ -114,7 +104,7 @@ export default function App() {
   const [editorMode, setEditorMode] = useState('code');   // 'code' | 'diff'
   const [code, setCode] = useState(DEFAULT_CODE);
   const [githubUrl, setGithubUrl] = useState('');
-  const [studentName, setStudentName] = useState('Alex Chen');
+  const [studentName, setStudentName] = useState('Afsah Haseeb');
   const [projectName, setProjectName] = useState('Auth Module');
 
   const [loading, setLoading] = useState(false);
@@ -221,7 +211,7 @@ export default function App() {
   const handleExportMarkdown = () => {
     if (!reviewResult) return;
     const timestamp = new Date().toLocaleString();
-    const mdContent = `# 🚀 CodeSense AI - Quality Review Report
+    const mdContent = `# CodeSense AI - Quality Review Report
 
 **Project Name:** ${projectName || 'Untitled Project'}  
 **Student:** ${studentName || 'Anonymous'}  
@@ -230,15 +220,15 @@ export default function App() {
 
 ---
 
-## 📊 Summary
+##  Summary
 - **Total Issues Detected:** ${reviewResult.totalIssues || 0}
-- **🚨 High Severity:** ${reviewResult.severityCounts?.high || 0}
-- **⚠️ Medium Severity:** ${reviewResult.severityCounts?.medium || 0}
-- **ℹ️ Low Severity:** ${reviewResult.severityCounts?.low || 0}
+- ** High Severity:** ${reviewResult.severityCounts?.high || 0}
+- ** Medium Severity:** ${reviewResult.severityCounts?.medium || 0}
+- **ℹ Low Severity:** ${reviewResult.severityCounts?.low || 0}
 
 ---
 
-## 🔍 Detailed Issues & Suggested Fixes
+##  Detailed Issues & Suggested Fixes
 
 ${(reviewResult.issues || []).map((issue, idx) => `
 ### ${idx + 1}. [${issue.severity?.toUpperCase() || 'INFO'}] ${issue.type?.toUpperCase() || 'GENERAL'} (Line ${issue.line || 'N/A'})
@@ -366,7 +356,7 @@ ${issue.suggestedFix}
                     type="text"
                     value={studentName}
                     onChange={(e) => setStudentName(e.target.value)}
-                    placeholder="e.g. Alex Chen"
+                    placeholder="e.g. Afsah Haseeb"
                     className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 font-medium"
                   />
                 </div>
@@ -557,13 +547,13 @@ ${issue.suggestedFix}
                     {/* Breakdown Badges */}
                     <div className="flex flex-col items-end space-y-1 text-xs">
                       <span className="px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 font-semibold border border-rose-200">
-                        🚨 {reviewResult.severityCounts?.high || 0} High
+                         {reviewResult.severityCounts?.high || 0} High
                       </span>
                       <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 font-semibold border border-amber-200">
-                        ⚠️ {reviewResult.severityCounts?.medium || 0} Med
+                         {reviewResult.severityCounts?.medium || 0} Med
                       </span>
                       <span className="px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 font-semibold border border-sky-200">
-                        ℹ️ {reviewResult.severityCounts?.low || 0} Low
+                         {reviewResult.severityCounts?.low || 0} Low
                       </span>
                     </div>
                   </div>
@@ -828,7 +818,7 @@ ${issue.suggestedFix}
                 onClick={handleSeedDemoData}
                 className="px-3 py-1.5 bg-white text-indigo-700 hover:bg-indigo-50 font-bold text-xs rounded-xl shadow-sm transition-all flex items-center space-x-1.5"
               >
-                <span>✨ Populate Demo Class</span>
+                <span> Populate Demo Class</span>
               </button>
             </div>
 
@@ -867,7 +857,7 @@ ${issue.suggestedFix}
                   <div className="text-lg font-bold text-amber-600 mt-1">Security / Secrets</div>
                 </div>
                 <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-                  ⚠️
+                 ⚠️ 
                 </div>
               </div>
             </div>
