@@ -43,7 +43,7 @@ const API_BASE = window.location.hostname === 'localhost' || window.location.hos
 const INITIAL_DEMO_SUBMISSIONS = [
   {
     _id: 'sub-1',
-    studentName: 'Alex Chen',
+    studentName: 'Afsah Haseeb',
     projectName: 'Auth Module',
     score: 65,
     grade: 'D',
@@ -145,17 +145,7 @@ function ScoreRing({ score = 0, grade = 'N/A', size = 116, strokeWidth = 10 }) {
   );
 }
 
-const DEFAULT_CODE = `// Sample buggy JavaScript code to test
-const apiKey = "AIzaSyD-secret-demo-key-12345";
-
-function login(user, pass) {
-  if (user == "admin") {
-    console.log("Welcome Admin! Access granted.");
-    return true;
-  }
-}
-
-login("admin", "wrong_password");`;
+const DEFAULT_CODE = `// Write your JavaScript code to test`;
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('reviewer');
@@ -163,7 +153,7 @@ export default function App() {
   const [editorMode, setEditorMode] = useState('code');
   const [code, setCode] = useState(DEFAULT_CODE);
   const [githubUrl, setGithubUrl] = useState('');
-  const [studentName, setStudentName] = useState('Alex Chen');
+  const [studentName, setStudentName] = useState('Afsah Haseeb');
   const [projectName, setProjectName] = useState('Auth Module');
 
   const [githubToken, setGithubToken] = useState(() => localStorage.getItem('codesense_github_token') || '');
@@ -433,7 +423,7 @@ export default function App() {
       // Save submission to state and localStorage
       const newSub = {
         _id: 'sub-' + Date.now(),
-        studentName: studentName || 'Alex Chen',
+        studentName: studentName || 'Afsah Haseeb',
         projectName: projectName || 'Auth Module',
         score: analysisResult.score,
         grade: analysisResult.grade,
@@ -609,7 +599,7 @@ ${issue.suggestedFix}
                     type="text"
                     value={studentName}
                     onChange={(e) => setStudentName(e.target.value)}
-                    placeholder="e.g. Alex Chen"
+                    placeholder="e.g. Afsah Haseeb"
                     className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 font-medium"
                   />
                 </div>
