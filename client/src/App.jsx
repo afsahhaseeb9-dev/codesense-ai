@@ -35,6 +35,11 @@ import {
   ResponsiveContainer
 } from 'recharts';
 
+// Automatically use local backend in development, and live Vercel domain in production
+const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://127.0.0.1:5000'
+  : '';
+
 // Custom inline SVG GitHub Icon
 function GithubIcon({ className = "w-4 h-4" }) {
   return (
@@ -142,7 +147,7 @@ export default function App() {
     const code = urlParams.get('code');
     if (code) {
       setOauthLoading(true);
-      fetch('http://127.0.0.1:5000/api/auth/github/token', {
+      fetch(`${API_BASE}/api/auth/github/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code })
@@ -173,10 +178,10 @@ export default function App() {
   const handleConnectGithub = async () => {
     try {
       setError('');
-      const res = await fetch('http://127.0.0.1:5000/api/auth/github/client-id');
+      const res = await fetch(`${API_BASE}/api/auth/github/client-id`);
       const { clientId } = await res.json();
       if (!clientId) {
-        setError('GitHub Client ID is not configured in server/.env');
+        setError('GitHub Client ID is not configured');
         return;
       }
       // Redirect user to GitHub OAuth authorize screen
@@ -195,7 +200,7 @@ export default function App() {
   // Fetch submissions safely from backend
   const fetchSubmissions = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/submissions');
+      const res = await fetch(`${API_BASE}/api/submissions`);
       if (res.ok) {
         const result = await res.json();
         const list = Array.isArray(result) ? result : (result?.data || []);
@@ -209,7 +214,7 @@ export default function App() {
 
   const handleSeedDemoData = async () => {
     try {
-      await fetch('http://127.0.0.1:5000/api/submissions/seed', { method: 'POST' });
+      await fetch(`${API_BASE}/api/submissions/seed`, { method: 'POST' });
       await fetchSubmissions();
     } catch (e) {
       console.error('Failed to seed demo data:', e);
@@ -229,12 +234,12 @@ export default function App() {
     setError('');
     setFetchLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/github/fetch', {
+      const res = await fetch(`${API_BASE}/api/github/fetch`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: githubUrl,
-          token: githubToken || null // <--- Pass OAuth token for private repos!
+          token: githubToken || null
         }),
       });
       const data = await res.json();
@@ -258,7 +263,7 @@ export default function App() {
     setError('');
     setLoading(true);
     try {
-      const res = await fetch('http://127.0.0.1:5000/api/review', {
+      const res = await fetch(`${API_BASE}/api/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
