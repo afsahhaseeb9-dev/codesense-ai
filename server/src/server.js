@@ -1,3 +1,8 @@
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -33,18 +38,62 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// 2. GitHub Fetch Route
+// 2. GitHub Fetch Route (Public + Private Repos)
 app.post('/api/github/fetch', async (req, res) => {
   try {
-    const { url } = req.body;
+    const { url, token } = req.body;
     if (!url) return res.status(400).json({ success: false, error: 'Please provide a GitHub URL' });
-    const fileData = await fetchGitHubFile(url);
+    const fileData = await fetchGitHubFile(url, token);
     res.status(200).json({ success: true, data: fileData });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
 });
+// GitHub OAuth: Exchange temporary 'code' for an access token
+app.post('/api/auth/github/token', async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      return res.status(400).json({ error: 'OAuth code is required' });
+    }
 
+    const clientId = process.env.GITHUB_CLIENT_ID;
+    const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+
+    if (!clientId || !clientSecret) {
+      return res.status(500).json({ error: 'GitHub OAuth credentials not configured on server' });
+    }
+
+    // Request access token from GitHub
+    const tokenRes = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        code
+      })
+    });
+
+    const tokenData = await tokenRes.json();
+
+    if (tokenData.error) {
+      return res.status(400).json({ error: tokenData.error_description || tokenData.error });
+    }
+
+    // Return the access token to the frontend
+    res.json({ accessToken: tokenData.access_token });
+  } catch (err) {
+    console.error('GitHub OAuth token exchange error:', err);
+    res.status(500).json({ error: 'Failed to exchange GitHub OAuth code' });
+  }
+});
+app.get('/api/auth/github/client-id', (req, res) => {
+  res.json({ clientId: process.env.GITHUB_CLIENT_ID || '' });
+});
 // 3. Quick Linter Route
 app.post('/api/lint', async (req, res) => {
   try {
@@ -184,6 +233,16 @@ app.post('/api/submissions/seed', (req, res) => {
 
   localSubmissions = [...demoData, ...localSubmissions];
   res.json({ success: true, count: demoData.length });
+});
+// Serve static client build in production
+const clientBuildPath = path.join(__dirname, '../../client/dist');
+app.use(express.static(clientBuildPath));
+
+// For any non-API route, serve index.html (SPA routing)
+app.get('*', (req, res) => {
+  if (!req.path.startsWith('/api')) {
+    res.sendFile(path.join(clientBuildPath, 'index.html'));
+  }
 });
 app.listen(PORT, () => {
   console.log(`CodeSense AI Server running on http://localhost:${PORT}`);

@@ -1,117 +1,97 @@
 /**
- * Parses a GitHub URL into owner, repo, branch, and file path
- * Examples:
- * https://github.com/owner/repo/blob/main/src/index.js
- * https://github.com/owner/repo
+ * Service to parse GitHub URLs and fetch file contents via GitHub REST API.
+ * Supports both Public and Private repositories via OAuth token.
  */
-export const parseGitHubUrl = (url) => {
+
+// Helper to parse GitHub URL into owner, repo, branch, and filepath
+export const parseGitHubUrl = (githubUrl) => {
   try {
-    const cleanUrl = url.trim().replace(/\/$/, '');
-    
-    // Pattern 1: Direct link to a file inside a branch
-    const fileMatch = cleanUrl.match(/github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+)/);
-    if (fileMatch) {
-      return {
-        owner: fileMatch[1],
-        repo: fileMatch[2],
-        branch: fileMatch[3],
-        path: fileMatch[4]
-      };
+    const parsed = new URL(githubUrl);
+    if (!parsed.hostname.includes('github.com')) {
+      throw new Error('Not a valid GitHub URL');
     }
 
-    // Pattern 2: Link to repository root
-    const repoMatch = cleanUrl.match(/github\.com\/([^/]+)\/([^/]+)/);
-    if (repoMatch) {
-      return {
-        owner: repoMatch[1],
-        repo: repoMatch[2],
-        branch: 'main',
-        path: null
-      };
+    const segments = parsed.pathname.split('/').filter(Boolean);
+    if (segments.length < 2) {
+      throw new Error('URL must include at least owner and repository name');
     }
 
-    return null;
+    const owner = segments[0];
+    const repo = segments[1];
+
+    // Format: github.com/owner/repo/blob/branch/path/to/file.js
+    if (segments[2] === 'blob' && segments.length >= 5) {
+      const branch = segments[3];
+      const filePath = segments.slice(4).join('/');
+      return { owner, repo, branch, filePath };
+    }
+
+    // Default to main or root file if not specified
+    return {
+      owner,
+      repo,
+      branch: 'main',
+      filePath: segments.slice(2).join('/') || 'index.js'
+    };
   } catch (err) {
-    return null;
+    throw new Error(`Failed to parse GitHub URL: ${err.message}`);
   }
 };
 
 /**
- * Fetches file content from the official GitHub REST API
- * @param {string} url - GitHub URL
- * @returns {Promise<Object>} File details and raw code
+ * Fetches file content from GitHub REST API.
+ * @param {string} url - GitHub file URL
+ * @param {string} [token] - Optional GitHub OAuth token for private repos
  */
-export const fetchGitHubFile = async (url) => {
-  const parsed = parseGitHubUrl(url);
-  if (!parsed) {
-    throw new Error('Invalid GitHub URL. Please provide a link like: https://github.com/owner/repo/blob/main/file.js');
+export const fetchGitHubFile = async (url, token = null) => {
+  const { owner, repo, branch, filePath } = parseGitHubUrl(url);
+
+  // GitHub REST API endpoint for file contents
+  const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`;
+
+  const headers = {
+    'Accept': 'application/vnd.github.v3+json',
+    'User-Agent': 'CodeSense-AI-App'
+  };
+
+  // If OAuth token exists, attach it to unlock PRIVATE repositories!
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
   }
 
-  // If a specific file path was provided
-  if (parsed.path) {
-    const apiUrl = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents/${parsed.path}?ref=${parsed.branch}`;
-    
-    const response = await fetch(apiUrl, {
-      headers: {
-        'User-Agent': 'CodeSense-AI-App',
-        'Accept': 'application/vnd.github.v3+json'
-      }
-    });
+  const response = await fetch(apiUrl, { headers });
 
-    if (!response.ok) {
-      if (response.status === 404) {
-        throw new Error('File not found in this repository. Please check the URL and branch name.');
-      }
-      if (response.status === 403) {
-        throw new Error('GitHub API rate limit reached. Please try again in a few minutes.');
-      }
-      throw new Error(`GitHub API error: ${response.statusText}`);
-    }
-
-    const data = await response.json();
-    
-    if (data.type !== 'file') {
-      throw new Error('The URL points to a folder. Please link directly to a code file.');
-    }
-
-    // GitHub returns file text in base64 encoding; decode it into readable text
-    const content = Buffer.from(data.content, 'base64').toString('utf-8');
-
-    return {
-      fileName: data.name,
-      path: data.path,
-      content,
-      repo: `${parsed.owner}/${parsed.repo}`,
-      branch: parsed.branch
-    };
-  } else {
-    // If only the repo was provided, search for standard entry files
-    const commonFiles = ['src/index.js', 'src/App.jsx', 'index.js', 'server.js', 'app.js', 'main.js'];
-    
-    for (const testPath of commonFiles) {
-      try {
-        const apiUrl = `https://api.github.com/repos/${parsed.owner}/${parsed.repo}/contents/${testPath}?ref=${parsed.branch}`;
-        const res = await fetch(apiUrl, {
-          headers: { 'User-Agent': 'CodeSense-AI-App', 'Accept': 'application/vnd.github.v3+json' }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.type === 'file') {
-            const content = Buffer.from(data.content, 'base64').toString('utf-8');
-            return {
-              fileName: data.name,
-              path: data.path,
-              content,
-              repo: `${parsed.owner}/${parsed.repo}`,
-              branch: parsed.branch
-            };
-          }
-        }
-      } catch (e) {
-        // continue checking next file
-      }
-    }
-
-    throw new Error('Could not automatically find an entry file. Please provide a direct file link (e.g. github.com/owner/repo/blob/main/index.js).');
+  if (response.status === 404) {
+    throw new Error(
+      token
+        ? 'File or private repository not found. Make sure the branch and path are correct.'
+        : 'File not found. If this is a PRIVATE repository, connect GitHub OAuth first!'
+    );
   }
+
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('GitHub API authorization failed or rate limit exceeded. Please reconnect GitHub OAuth.');
+  }
+
+  if (!response.ok) {
+    throw new Error(`GitHub API error: ${response.statusText}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.content) {
+    throw new Error('Target is not a readable file or file has no content.');
+  }
+
+  // GitHub API returns file content Base64 encoded; decode to UTF-8
+  const code = Buffer.from(data.content, 'base64').toString('utf-8');
+
+  return {
+    code,
+    fileName: data.name,
+    owner,
+    repo,
+    branch,
+    filePath
+  };
 };
