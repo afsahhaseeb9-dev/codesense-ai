@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const submissionSchema = new mongoose.Schema(
   {
-    studentName: { type: String, default: 'Alex Chen' },
+    studentName: { type: String, default: 'Afsah Haseeb' },
     projectName: { type: String, default: 'Assignment 1 - Auth' },
     sourceType: { type: String, default: 'paste' },
     githubUrl: { type: String, default: '' },

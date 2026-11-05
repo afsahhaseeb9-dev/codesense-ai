@@ -144,7 +144,6 @@ function ScoreRing({ score = 0, grade = 'N/A', size = 116, strokeWidth = 10 }) {
     </div>
   );
 }
-
 const DEFAULT_CODE = `// Write your JavaScript code to test`;
 
 export default function App() {
@@ -153,6 +152,7 @@ export default function App() {
   const [editorMode, setEditorMode] = useState('code');
   const [code, setCode] = useState(DEFAULT_CODE);
   const [githubUrl, setGithubUrl] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState('javascript');
   const [studentName, setStudentName] = useState('Afsah Haseeb');
   const [projectName, setProjectName] = useState('Auth Module');
 
@@ -332,7 +332,12 @@ export default function App() {
         const res = await fetch(`${API_BASE}/api/review`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code, studentName, projectName }),
+body: JSON.stringify({
+  code,
+  studentName,
+  projectName,
+  language: selectedLanguage
+}),
         });
 
         if (res.ok) {
@@ -643,7 +648,15 @@ ${issue.suggestedFix}
                       <span>Fetch from GitHub</span>
                     </button>
                   </div>
-
+<select
+  value={selectedLanguage}
+  onChange={(e) => setSelectedLanguage(e.target.value)}
+  className="px-2.5 py-1 text-xs font-bold bg-white text-slate-700 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+>
+  <option value="javascript">JavaScript</option>
+  <option value="typescript">TypeScript</option>
+  <option value="python">Python</option>
+</select>
                   <div className="flex items-center space-x-1 bg-slate-200/70 p-1 rounded-xl">
                     <button
                       onClick={() => setEditorMode('code')}
@@ -741,7 +754,7 @@ ${issue.suggestedFix}
                   {editorMode === 'diff' && reviewResult ? (
                     <DiffEditor
                       height="100%"
-                      language="javascript"
+language={selectedLanguage}
                       theme="vs"
                       original={code}
                       modified={reviewResult.improvedCode || code}
@@ -757,7 +770,7 @@ ${issue.suggestedFix}
                   ) : (
                     <Editor
                       height="100%"
-                      defaultLanguage="javascript"
+language={selectedLanguage}
                       theme="vs"
                       value={code}
                       onChange={(val) => setCode(val || '')}

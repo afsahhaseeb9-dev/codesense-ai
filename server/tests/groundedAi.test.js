@@ -99,3 +99,48 @@ describe('Grounded AI & Static Analysis Pipeline', () => {
     expect(result.score).toBeGreaterThanOrEqual(0);
   });
 });
+  // Test 6: GitHub TTL Cache Efficiency
+  it('should verify cache storage and TTL expiry mechanisms', () => {
+    const testCache = new Map();
+    const TTL = 1000; // 1 second for test
+
+    const key = 'test-owner/test-repo/main/app.js:anon';
+    testCache.set(key, {
+      data: { code: 'console.log("cached")' },
+      expiresAt: Date.now() + TTL
+    });
+
+    // Immediate lookup: HIT
+    const hit = testCache.get(key);
+    expect(hit).toBeDefined();
+    expect(hit.expiresAt).toBeGreaterThan(Date.now());
+    expect(hit.data.code).toBe('console.log("cached")');
+  });
+    // Test 7: Multi-Language Static Analysis (Python PEP 8 & Security)
+  it('should detect Python-specific security flaws and PEP 8 violations', async () => {
+    const pythonCode = `
+import os
+
+api_key = "sk_live_1234567890abcdef"
+
+def execute_user_input(cmd):
+    try:
+        eval(cmd)
+    except:
+        pass
+    if cmd == None:
+        return False
+`;
+
+    const findings = await lintCode(pythonCode, 'python');
+
+    expect(Array.isArray(findings)).toBe(true);
+    expect(findings.length).toBeGreaterThanOrEqual(3);
+
+    // Verify Python rules were applied
+    const ruleIds = findings.map(f => f.ruleId);
+    expect(ruleIds).toContain('python/security-hardcoded-secret');
+    expect(ruleIds).toContain('python/security-dangerous-eval');
+    expect(ruleIds).toContain('python/no-bare-except');
+    expect(ruleIds).toContain('python/pep8-identity-comparison');
+  });

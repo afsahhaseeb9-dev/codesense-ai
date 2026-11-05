@@ -109,11 +109,11 @@ app.post('/api/lint', async (req, res) => {
 // 4. Hybrid Review Route
 app.post('/api/review', async (req, res) => {
   try {
-    const { code, studentName, projectName, sourceType, githubUrl } = req.body;
+    const { code, studentName, projectName, sourceType, githubUrl, language } = req.body;
     if (!code) return res.status(400).json({ error: 'Please provide code in request body' });
 
     console.log(' Running ESLint static analysis...');
-    const linterIssues = await lintCode(code);
+    const linterIssues = await lintCode(code, language || 'javascript');
 
     console.log(' Sending code and linter findings to Gemini AI...');
     const aiReview = await reviewCodeWithGemini(code, linterIssues);
@@ -122,7 +122,7 @@ app.post('/api/review', async (req, res) => {
     const scoreData = calculateQualityScore(aiReview.issues || []);
 
     const submissionData = {
-      studentName: studentName || 'Alex Chen',
+      studentName: studentName || 'Afsah Haseeb',
       projectName: projectName || 'Assignment 1 - Auth',
       sourceType: sourceType || 'paste',
       githubUrl: githubUrl || '',
@@ -181,7 +181,7 @@ app.post('/api/submissions/seed', (req, res) => {
   const demoData = [
     {
       _id: 'seed-1',
-      studentName: 'Alex Chen',
+      studentName: 'Afsah Haseeb',
       projectName: 'Auth Module',
       score: 65,
       grade: 'D',

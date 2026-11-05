@@ -1,7 +1,21 @@
 /**
  * Service to parse GitHub URLs and fetch file contents via GitHub REST API.
- * Supports both Public and Private repositories via OAuth token.
+ * Features an in-memory TTL Cache to reduce GitHub API calls and prevent rate limiting.
  */
+
+// In-memory cache store: Map<cacheKey, { data, expiresAt }>
+const githubCache = new Map();
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes cache TTL
+
+// Helper to clean up expired entries periodically
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of githubCache.entries()) {
+    if (entry.expiresAt <= now) {
+      githubCache.delete(key);
+    }
+  }
+}, 5 * 60 * 1000); // Check every 5 minutes
 
 // Helper to parse GitHub URL into owner, repo, branch, and filepath
 export const parseGitHubUrl = (githubUrl) => {
@@ -19,14 +33,14 @@ export const parseGitHubUrl = (githubUrl) => {
     const owner = segments[0];
     const repo = segments[1];
 
-    // Format: github.com/owner/repo/blob/branch/path/to/file.js
+    // Format: github.com/owner/repo/blob/branch/path/to/file.ext
     if (segments[2] === 'blob' && segments.length >= 5) {
       const branch = segments[3];
       const filePath = segments.slice(4).join('/');
       return { owner, repo, branch, filePath };
     }
 
-    // Default to main or root file if not specified
+    // Default to main branch and file
     return {
       owner,
       repo,
@@ -39,14 +53,30 @@ export const parseGitHubUrl = (githubUrl) => {
 };
 
 /**
- * Fetches file content from GitHub REST API.
+ * Fetches file content from GitHub REST API with TTL caching.
  * @param {string} url - GitHub file URL
- * @param {string} [token] - Optional GitHub OAuth token for private repos
+ * @param {string} [token] - Optional GitHub OAuth token
  */
 export const fetchGitHubFile = async (url, token = null) => {
   const { owner, repo, branch, filePath } = parseGitHubUrl(url);
 
-  // GitHub REST API endpoint for file contents
+  // Generate unique cache key based on URL and auth state
+  const cacheKey = `${owner}/${repo}/${branch}/${filePath}:${token ? 'auth' : 'anon'}`;
+
+  // 1. Check Cache HIT
+  const cached = githubCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    console.log(`⚡ [Cache HIT] Serving ${owner}/${repo}/${filePath} from in-memory cache.`);
+    return {
+      ...cached.data,
+      fromCache: true,
+      cacheExpiresInSeconds: Math.round((cached.expiresAt - Date.now()) / 1000)
+    };
+  }
+
+  console.log(`🌐 [Cache MISS] Fetching ${owner}/${repo}/${filePath} from GitHub REST API...`);
+
+  // 2. Fetch from GitHub REST API
   const apiUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${filePath}?ref=${branch}`;
 
   const headers = {
@@ -54,7 +84,6 @@ export const fetchGitHubFile = async (url, token = null) => {
     'User-Agent': 'CodeSense-AI-App'
   };
 
-  // If OAuth token exists, attach it to unlock PRIVATE repositories!
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -64,13 +93,13 @@ export const fetchGitHubFile = async (url, token = null) => {
   if (response.status === 404) {
     throw new Error(
       token
-        ? 'File or private repository not found. Make sure the branch and path are correct.'
-        : 'File not found. If this is a PRIVATE repository, connect GitHub OAuth first!'
+        ? 'File or private repository not found. Verify the branch and filepath.'
+        : 'File not found. If this is a PRIVATE repository, please connect GitHub OAuth first.'
     );
   }
 
   if (response.status === 401 || response.status === 403) {
-    throw new Error('GitHub API authorization failed or rate limit exceeded. Please reconnect GitHub OAuth.');
+    throw new Error('GitHub API rate limit exceeded or authorization failed. Connect GitHub OAuth for 5,000 requests/hr.');
   }
 
   if (!response.ok) {
@@ -83,15 +112,30 @@ export const fetchGitHubFile = async (url, token = null) => {
     throw new Error('Target is not a readable file or file has no content.');
   }
 
-  // GitHub API returns file content Base64 encoded; decode to UTF-8
+  // Decode Base64 to UTF-8
   const code = Buffer.from(data.content, 'base64').toString('utf-8');
 
-  return {
+  const resultData = {
     code,
     fileName: data.name,
     owner,
     repo,
     branch,
-    filePath
+    filePath,
+    fileSize: data.size,
+    fromCache: false
   };
+
+  // 3. Save to TTL Cache
+  githubCache.set(cacheKey, {
+    data: resultData,
+    expiresAt: Date.now() + CACHE_TTL_MS
+  });
+
+  return resultData;
+};
+
+// Helper for testing or manually invalidating the cache
+export const clearGitHubCache = () => {
+  githubCache.clear();
 };
